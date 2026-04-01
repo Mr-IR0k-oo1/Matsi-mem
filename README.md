@@ -3,10 +3,10 @@
 Terminal AI operating layer. Memory, context, execution — all in one TUI.
 
 ```
-┌ ◆ matis-mem  project: millcheck  model: ollama/llama3  ◉ done ──────────────┐
+┌ ◆ matis-mem  project: millcheck  model: ollama/llama3  ◉ done ─────────────┐
 │                    │                                                       │
 │  PROJECTS          │  PROMPT                                               │
-│ ▶ millcheck        │  fix the edge case in the MTC parser where            │
+│ ▶ frontend         │  fix the edge case in the MTC parser where             │
 │   api-gateway      │  null dates cause a panic▌                            │
 │                    ├───────────────────────────────────────────────────────│
 │                    │  CONTEXT              │  MODEL                        │
