@@ -1,20 +1,21 @@
 [package]
 name = "matis-mem"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-description = "Terminal AI operating layer — memory, context, execution"
+description = "Terminal AI operating layer — memory, context, execution, agent logging"
 
 [[bin]]
 name = "matis-mem"
 path = "src/main.rs"
 
 [dependencies]
-ratatui    = "0.26"
-crossterm  = "0.27"
-serde      = { version = "1", features = ["derive"] }
-serde_json = "1"
-anyhow     = "1"
-thiserror  = "1"
-chrono     = { version = "0.4", features = ["clock"] }
-dirs       = "5"
-libc       = "0.2"
+ratatui     = "0.26"
+crossterm   = "0.27"
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+anyhow      = "1"
+thiserror   = "1"
+chrono      = { version = "0.4", features = ["clock"] }
+dirs        = "5"
+libc        = "0.2"
+notify      = { version = "6", default-features = false, features = ["macos_kqueue"] }
