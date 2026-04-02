@@ -1,6 +1,6 @@
-# matis-mem
+# Matis-MEM
 
-Terminal AI operating layer. Memory, context, execution — all in one TUI.
+Terminal AI memory system. Persistent context, multi-model execution, and session logging in one TUI.
 
 ```
 ┌ ◆ matis-mem  project: millcheck  model: ollama/llama3  ◉ done ──────────────┐
@@ -23,32 +23,74 @@ Terminal AI operating layer. Memory, context, execution — all in one TUI.
  [j/k] scroll  [Tab] → prompt  [y] copy  [Ctrl+R] run again
 ```
 
-## What it does
+## Quick start
 
-1. **Memory** — stores projects, sessions, and knowledge as plain JSON in `~/.matis-mem/`
-2. **Context** — builds focused context: project + last N sessions + optional knowledge search
-3. **Execution** — routes prompts to any model (ollama, gemini) through one interface
-4. **Logging** — every run is saved automatically. No exceptions.
-
-## Install
+### Install
 
 ```bash
-git clone <repo> && cd matis-mem
+git clone <repo> && cd Matis-MEM
 bash install.sh
 ```
 
 Requires: Rust 1.75+
 
-## Models
+### Run
 
-| Model | Requirement |
-|-------|-------------|
-| `ollama/llama3` | `ollama pull llama3` |
-| `ollama/mistral` | `ollama pull mistral` |
-| `ollama/codellama` | `ollama pull codellama` |
-| `gemini-cli` | `npm install -g @google/gemini-cli && gemini auth` |
+```bash
+matis-mem
+```
 
-## Keybindings
+## What it does
+
+1. **Memory** — stores projects, sessions, and knowledge as plain JSON in `~/.matis-mem/`
+2. **Context** — builds focused context: project + last N sessions + optional knowledge search
+3. **Execution** — routes prompts to multiple models (ollama, gemini, claude, mistral, amp) through unified interface
+4. **Logging** — every run is saved automatically with response metadata and duration tracking
+5. **Watcher** — monitors tool execution logs and indexes responses for context retrieval
+
+## Architecture
+
+### Core modules
+
+- **`executor/`** — Model execution (ollama, gemini, claude, mistral, amp, vibe)
+- **`context/`** — Context building: projects + sessions + knowledge
+- **`data/`** — Persistent storage: projects, sessions, knowledge, agent logs
+- **`ui/`** — TUI rendering with ratatui
+- **`watcher/`** — Log monitoring and agent response indexing
+- **`config.rs`** — Config management and env vars
+- **`error.rs`** — Custom error types
+
+## Data layout
+
+```
+~/.matis-mem/
+├── projects/
+│   └── millcheck.json          # { name, goal, constraints, decisions, notes }
+├── sessions/
+│   └── millcheck/
+│       └── 20260401_143022_001.json  # { prompt, context_summary, response, duration_ms, model, … }
+├── knowledge/
+│   └── pdf_parsing.json        # { topic, notes: [...], tags: [...] }
+├── agent_logs/
+│   └── 2026-04-01.jsonl        # { timestamp, thread, agent_output, indexed_response, … }
+└── prompts/                    # reserved for saved prompt templates
+```
+
+## Context building
+
+```
+CONTEXT =
+  [PROJECT]           always first, contains goal + constraints + decisions
++ [RECENT SESSIONS]   last N (default: 2) — prevents repeating the same question
++ [KNOWLEDGE]         keyword search across knowledge/ (optional, off by default)
+```
+
+Context is **explicit and minimal**. You can see exactly what's being injected
+via the checkboxes in the Context panel before every run.
+
+## Usage
+
+### Keybindings
 
 | Key | Action |
 |-----|--------|
@@ -65,55 +107,51 @@ Requires: Rust 1.75+
 | `c` (in response) | Clear and start new prompt |
 | `q` / `Ctrl+C` | Quit |
 
-## Data layout
+## Supported Models
 
-```
-~/.matis-mem/
-├── projects/
-│   └── millcheck.json          # { name, goal, constraints, decisions, notes }
-├── sessions/
-│   └── millcheck/
-│       └── 20260401_143022_001.json  # { prompt, context_summary, response, duration_ms, … }
-├── knowledge/
-│   └── pdf_parsing.json        # { topic, notes: [...], tags: [...] }
-└── prompts/                    # reserved for saved prompt templates
-```
+| Model | Executor | Requirement |
+|-------|----------|-------------|
+| `ollama/*` | Generic ollama | `ollama serve` (running locally) |
+| `gemini` | Google Gemini | `gemini auth` configured |
+| `claude` | Anthropic Claude | `ANTHROPIC_API_KEY` env var |
+| `mistral` | Mistral API | `MISTRAL_API_KEY` env var |
+| `amp` | Amp Agent | `amp` CLI installed and authenticated |
+| `vibe` | Vibe (local) | Custom local model endpoint |
 
-## Context building
+## Development
 
-```
-CONTEXT =
-  [PROJECT]           always first, contains goal + constraints + decisions
-+ [RECENT SESSIONS]   last N (default: 2) — prevents repeating the same question
-+ [KNOWLEDGE]         keyword search across knowledge/ (optional, off by default)
-```
-
-Context is **explicit and minimal**. You can see exactly what's being injected
-via the checkboxes in the Context panel before every run.
-
-## Adding a new model
+### Adding a new model
 
 1. Create `src/executor/mymodel.rs` implementing the `Executor` trait:
 
 ```rust
+use crate::executor::Executor;
+
 pub struct MyModelExecutor;
 
 impl Executor for MyModelExecutor {
     fn name(&self) -> &str { "mymodel" }
     fn run(&self, prompt: &str) -> Result<String> {
         // spawn subprocess, return stdout
+        unimplemented!()
     }
 }
 ```
 
-2. Add a variant to `Model` in `src/executor/mod.rs`
-3. Add it to `Model::all_presets()`
-4. Done — it appears in the model selector automatically
+2. Add module to `src/executor/mod.rs`:
+   ```rust
+   mod mymodel;
+   pub use mymodel::MyModelExecutor;
+   ```
 
-## Design rules (don't break these)
+3. Add variant to `Model` enum and `impl Model::all_presets()`
+4. Done — appears in the model selector automatically
+
+### Design rules (don't break these)
 
 - **Deterministic context** — no magic injection. What you see in the panel is what gets sent.
 - **Small context > big context** — default is project + 2 sessions. Raise it only when needed.
-- **Model-agnostic** — `executor::run(model, prompt)` is the only call site.
-- **Logging is mandatory** — `Session::save()` is called before `ExecMsg::Done` is sent.
-- **TUI = control, not logic** — `render.rs` only reads state. All logic is in `app.rs`, `context/`, `executor/`.
+- **Single executor call site** — all model invocations go through unified interface
+- **Logging is mandatory** — sessions and agent logs saved before UI confirmation
+- **TUI = control, not logic** — UI only reads/renders state. Logic in `app.rs`, `context/`, `executor/`, `watcher/`
+- **Extensible executors** — adding models requires only implementing `Executor` trait
